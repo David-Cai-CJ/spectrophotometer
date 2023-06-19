@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1406</width>
-    <height>857</height>
+    <width>884</width>
+    <height>467</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,8 +19,8 @@
      <widget class="QWidget" name="widget" native="true">
       <property name="minimumSize">
        <size>
-        <width>800</width>
-        <height>0</height>
+        <width>600</width>
+        <height>400</height>
        </size>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -34,32 +34,23 @@
          </property>
          <layout class="QHBoxLayout" name="horizontalLayout_12">
           <item>
-           <widget class="QToolButton" name="toolButton_5">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="minimumSize">
-             <size>
-              <width>0</width>
-              <height>20</height>
-             </size>
-            </property>
-            <property name="maximumSize">
-             <size>
-              <width>16777215</width>
-              <height>40</height>
-             </size>
+           <widget class="QCheckBox" name="relative_checkbox">
+            <property name="enabled">
+             <bool>false</bool>
             </property>
             <property name="text">
-             <string>Drop down view</string>
+             <string>Show Relative</string>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+            <property name="tristate">
+             <bool>false</bool>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QLabel" name="label_10">
+           <widget class="QLabel" name="max_value_label">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -84,7 +75,10 @@
            </widget>
           </item>
           <item>
-           <widget class="QLabel" name="label_11">
+           <widget class="QLabel" name="x_value_label">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
             <property name="sizePolicy">
              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -109,7 +103,10 @@
            </widget>
           </item>
           <item>
-           <widget class="QLabel" name="label_12">
+           <widget class="QLabel" name="y_value_label">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
             <property name="sizePolicy">
              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
               <horstretch>0</horstretch>
@@ -137,7 +134,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QWidget" name="widget_3" native="true">
+        <widget class="PlotWidget" name="viewer" native="true">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
            <horstretch>0</horstretch>
@@ -152,10 +149,16 @@
     <item>
      <widget class="QWidget" name="widget_4" native="true">
       <property name="sizePolicy">
-       <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+       <sizepolicy hsizetype="Maximum" vsizetype="Expanding">
         <horstretch>0</horstretch>
         <verstretch>0</verstretch>
        </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>250</width>
+        <height>0</height>
+       </size>
       </property>
       <layout class="QGridLayout" name="gridLayout_4">
        <item row="0" column="0">
@@ -169,34 +172,81 @@
             </sizepolicy>
            </property>
            <property name="text">
-            <string>Acquisition Time</string>
+            <string>Integration Time (ms)</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QSpinBox" name="spinBox_6"/>
-         </item>
-        </layout>
-       </item>
-       <item row="1" column="0">
-        <layout class="QHBoxLayout" name="horizontalLayout_18">
-         <item>
-          <widget class="QPushButton" name="pushButton_6">
-           <property name="text">
-            <string>Reference</string>
+          <widget class="QSpinBox" name="integration_time_spinbox">
+           <property name="maximum">
+            <number>10000</number>
            </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QToolButton" name="toolButton_8">
-           <property name="text">
-            <string>Open File</string>
+           <property name="singleStep">
+            <number>50</number>
+           </property>
+           <property name="value">
+            <number>100</number>
            </property>
           </widget>
          </item>
         </layout>
        </item>
-       <item row="2" column="0">
+       <item row="3" column="0">
+        <layout class="QVBoxLayout" name="verticalLayout">
+         <property name="sizeConstraint">
+          <enum>QLayout::SetMinimumSize</enum>
+         </property>
+         <item>
+          <widget class="QWidget" name="widget_3" native="true">
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>150</height>
+            </size>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout">
+            <item>
+             <widget class="QToolButton" name="select_folder_button">
+              <property name="text">
+               <string>Select Folder</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_8">
+              <property name="text">
+               <string>Prefix</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="prefix_line_edit"/>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="folder_label">
+           <property name="maximumSize">
+            <size>
+             <width>16777215</width>
+             <height>50</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>(Directory not Set)</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="4" column="0">
         <layout class="QHBoxLayout" name="horizontalLayout_15">
          <item>
           <widget class="QLabel" name="label_7">
@@ -212,17 +262,23 @@
           </widget>
          </item>
          <item>
-          <widget class="QSpinBox" name="spinBox_5">
+          <widget class="QSpinBox" name="measure_number_spinbox">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
              <horstretch>0</horstretch>
              <verstretch>0</verstretch>
             </sizepolicy>
            </property>
+           <property name="minimum">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <number>50</number>
+           </property>
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="pushButton_5">
+          <widget class="QPushButton" name="measure_button">
            <property name="text">
             <string>Measure</string>
            </property>
@@ -230,29 +286,38 @@
          </item>
         </layout>
        </item>
-       <item row="3" column="0">
-        <layout class="QHBoxLayout" name="horizontalLayout_16">
-         <property name="sizeConstraint">
-          <enum>QLayout::SetMinimumSize</enum>
-         </property>
-         <item>
-          <widget class="QToolButton" name="toolButton_7">
-           <property name="text">
-            <string>Select Folder</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="label_8">
-           <property name="text">
-            <string>Prefix</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLineEdit" name="lineEdit_3"/>
-         </item>
-        </layout>
+       <item row="1" column="0">
+        <widget class="QWidget" name="widget_6" native="true">
+         <layout class="QVBoxLayout" name="verticalLayout_4">
+          <item>
+           <widget class="QWidget" name="widget_5" native="true">
+            <layout class="QHBoxLayout" name="horizontalLayout_3">
+             <item>
+              <widget class="QLabel" name="label_2">
+               <property name="text">
+                <string>Ref</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="select_reference_button">
+               <property name="text">
+                <string>Open Folder</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="deselect_reference_button">
+               <property name="text">
+                <string>Deselect</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </widget>
        </item>
       </layout>
      </widget>
@@ -264,13 +329,21 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1406</width>
-     <height>26</height>
+     <width>884</width>
+     <height>22</height>
     </rect>
    </property>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>PlotWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">pyqtgraph</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

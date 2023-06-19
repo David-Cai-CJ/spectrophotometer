@@ -4,11 +4,13 @@ from pyqtgraph.Qt import QtWidgets, QtGui
 import numpy as np
 from contextlib import contextmanager
 from qdarkstyle import load_stylesheet_pyqt5
-import sys, os
+import sys
+import os
 from scipy.optimize import curve_fit, OptimizeWarning
 from scipy.signal import find_peaks
 
-gaus = lambda x, a, x0, sigma: a * np.exp(-((x - x0) ** 2) / (2 * sigma ** 2))
+
+def gaus(x, a, x0, sigma): return a * np.exp(-((x - x0) ** 2) / (2 * sigma ** 2))
 
 
 @contextmanager
@@ -37,7 +39,7 @@ def run():
 
 
 class liveview(QtWidgets.QMainWindow):
-    def __init__(self, interval, serial_number = None):
+    def __init__(self, interval, serial_number=None):
         super().__init__()
         self.interval = interval
         if serial_number is not None:
@@ -193,6 +195,6 @@ class liveview(QtWidgets.QMainWindow):
         return
 
 
-## Start Qt event loop unless running in interactive mode or using pyside.
+# Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == "__main__":
     run()
