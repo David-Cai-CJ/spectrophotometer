@@ -10,7 +10,7 @@ def run():
     pg.setConfigOption("foreground", "w")
 
     app = QtWidgets.QApplication(sys.argv)
-    ui = LiveViewUi(200)
+    ui = LiveViewUi(1)
     sys.exit(app.exec_())
 
 
