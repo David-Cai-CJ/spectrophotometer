@@ -10,7 +10,7 @@ import sys
 import os
 from scipy.optimize import curve_fit, OptimizeWarning
 from scipy.signal import find_peaks
-
+import datetime
 
 class LiveViewUi(QtWidgets.QMainWindow):
     save_folder_signal = QtCore.pyqtSignal(str)
@@ -82,29 +82,32 @@ class LiveViewUi(QtWidgets.QMainWindow):
     
     def reference_file_dialog(self):
         dialog = QFileDialog(self, caption='Reference File')
-
         dialog.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
         dialog.setFileMode(QtWidgets.QFileDialog.AnyFile)
         # dialog.setOption(QtWidgets.QFileDialog.ShowDirsOnly, True)
         dialog.setLabelText(QtWidgets.QFileDialog.Accept, "Select File")
+        
+        tree_view = dialog.findChild(QtWidgets.QTreeView)
+        tree_view.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
+        
         if dialog.exec_():
             files = dialog.selectedFiles()
+        
             
-            if len(files) > 1:
-                pass
-            
-            if len(files) ==1:
-                self.reference_file = files[0]
-                
-                self.read_reference(self.reference_file)
+            if self.read_reference(files):
                 self._reference_data_item.setData(self.ref_xdata, self.ref_ydata)
                 self.relative_checkbox.setEnabled(True)
+                self.select_reference_button.setText(f'Averaged from\n{len(files)} files')
+                self.select_reference_button.setFont(QtGui.QFont('Segoe UI', weight=QtGui.QFont.Bold))
             
     def deselect_reference(self):
         self.relative_checkbox.setChecked(False)
         self.relative_checkbox.setEnabled(False)
         self._reference_data_item.clear()
         self._reference_data_item.setVisible(True)
+        
+        self.select_reference_button.setText(f'Open File(s)')
+        self.select_reference_button.setFont(QtGui.QFont('Segoe UI', weight=QtGui.QFont.Normal))
     
     def relative_state_changed(self, state):
         if self.relative_checkbox.isChecked():
@@ -150,7 +153,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
         except AttributeError:
             _dis_ls.append('❌')
 
-        str_display = 'Folder:{0}\tPrefix:{1}'.format(*_dis_ls)
+        str_display = 'Folder:  {0}\nPrefix:  {1}'.format(*_dis_ls)
         self.statusbar.showMessage(str_display, msecs= 10000)
         self.folder_label.setText(str_display)
 
@@ -170,16 +173,39 @@ class LiveViewUi(QtWidgets.QMainWindow):
         n_times = int(self.measure_number_spinbox.value())
         
         for n in np.arange(n_times):
-            np.savetxt(_file_directory + f"_{n}.csv", self.spec.spectrum(), delimiter=',')
+            np.savetxt(_file_directory + f"_{n}.csv", self.spec.spectrum().T, 
+                       fmt = '%-.18E , %-.18E', newline='\n',
+                       header = '# x (wavelengths), y (counts)',
+                       comments=  '\n'.join([f'# Integration time = {self.integration_time_edit.text()} ms',
+                                   f'# Spectrometer: {self.spec.model}',
+                                   '# Time: '+ datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'),
+                                   '\n']))
         
-        _str_display = f'{n}'+ "Files saved under"+ _file_directory
+        _str_display = f'👌 {n+1}'+ " Files saved under"+ self.save_folder + '/' + self.prefix +'_<......>.csv'
         
-        self.statusbar.showMessage(_str_display, msecs= 5000)
+        self.statusbar.showMessage(_str_display, msecs= 10000)
         
-    def read_reference(self, path):
-        x, y = np.loadtxt(path, delimiter = ',')
-        self.ref_xdata = np.array(x)
-        self.ref_ydata = np.array(y)
+    def read_reference(self, paths):
+        """
+        Select one or more files to get an average reference. 
+        Returns true if such reference spectra can be generated successfully."""
+        _y_data = []
+        
+        for f in paths:
+            x, y = np.loadtxt(f, delimiter = ',').T
+        
+            try:
+                if np.any(x != self.ref_xdata):
+                    self.statusbar.showMessage('❌ Selected reference data contain different wavelength selections.', msecs= 5000)
+                    return False
+                    
+            except AttributeError:
+                self.ref_xdata = x
+            
+            _y_data.append(y)
+        
+        self.ref_ydata = np.mean(_y_data, axis=0)
+        return True
 
     def change_integration_time(self, integration_time=100):  # argument is in ms
         try:
