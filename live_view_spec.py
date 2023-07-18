@@ -164,16 +164,18 @@ class LiveViewUi(QtWidgets.QMainWindow):
             else:
                 self.statusbar.showMessage('⛔️Set prefix to none empty value.', msecs= 5000)
                 return
+            
         except AttributeError:
             self.statusbar.showMessage('❌ Save directory was not established.', msecs= 5000)
             return
         
-        # except FileNotFoundError:
-        #     os.mkdir(path=directory)
+        if not os.path.exists(_file_directory):
+            os.makedirs(_file_directory)
+        
         n_times = int(self.measure_number_spinbox.value())
         
         for n in np.arange(n_times):
-            np.savetxt(_file_directory + f"_{n}.csv", self.spec.spectrum().T, 
+            np.savetxt(_file_directory + os.path.sep + f"_{n}.csv", self.spec.spectrum().T, 
                        fmt = '%-.18E , %-.18E', newline='\n',
                        header = '# x (wavelengths), y (counts)',
                        comments=  '\n'.join([f'# Integration time = {self.integration_time_edit.text()} ms',
@@ -228,7 +230,9 @@ class LiveViewUi(QtWidgets.QMainWindow):
         
 
     def update(self):
-        x,y = self.readData()
+        self.readData()
+        x = self.xdata
+        y = self.ydata
         
         self.max_value_label.setText(f'Max: {np.max(y):.0f}/{self.spec.max_intensity:.0f}')
         
