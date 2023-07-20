@@ -11,51 +11,40 @@ import os
 from scipy.optimize import curve_fit, OptimizeWarning
 from scipy.signal import find_peaks
 import datetime
+from spec import SpectrumGrabber
+
 
 class LiveViewUi(QtWidgets.QMainWindow):
     save_folder_signal = QtCore.pyqtSignal(str)
-    
+
     def __init__(self, interval, serial_number=None,  *args, **kwargs):
         log.debug("Initializing Spectrometer Window")
         super().__init__(*args, **kwargs)
         uic.loadUi("spec_viewer.ui", self)
 
-        
         self.statusbar.showMessage('Ready')
-        
+
         self.settings = QtCore.QSettings(
             "Siwick Research Group", "Spectrometer Liveview", parent=self
         )
 
-        self.interval = interval    # Nothing to do with integration time
-        
-        if serial_number is not None:
-            self.spec = Spectrometer.from_serial_number(serial_number)
-            self.serial_number = serial_number
-        else:
-            # _serials_in_lab = ['USB2G9152', 
-            #                    'HRC2000+']
-            self.spec = Spectrometer.from_first_available()
-            self.serial_number = self.spec.serial_number         
-
+        self.spec_grabber = SpectrumGrabber()
 
         self.integration_time_edit.editingFinished.connect(
-            lambda: self.change_integration_time(self.integration_time_edit.text()))
-        
-        self.integration_time_edit.editingFinished.emit() # Initialize to 100 ms int. time.
-        
+            lambda: self.spec_grabber.change_integration_time(self.integration_time_edit.text()))
+
+        self.integration_time_edit.editingFinished.emit()  
 
         self.viewer.getPlotItem().setLabel("left", "Counts [au]")
         self.viewer.getPlotItem().setLabel("bottom", "Wavelength [nm]")
         self.viewer.setLogMode(False, True)
-        
+
         self._measurements_data_item = pg.PlotDataItem(
             pen=pg.mkPen("r", width=1),
         )
         self._reference_data_item = pg.PlotDataItem(
             pen=pg.mkPen("g", width=0.5),
         )
-
 
         self.viewer.addItem(self._measurements_data_item)
         self.viewer.addItem(self._reference_data_item)
@@ -65,7 +54,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
         self.select_folder_button.clicked.connect(self.save_file_dialog)
         self.select_reference_button.clicked.connect(self.reference_file_dialog)
-        self.save_folder_signal.connect(lambda x:print(os.path.basename(x)))
+        self.save_folder_signal.connect(lambda x: print(os.path.basename(x)))
         self.deselect_reference_button.clicked.connect(self.deselect_reference)
         self.relative_checkbox.stateChanged.connect(self.relative_state_changed)
         self.measure_button.clicked.connect(self.measure)
@@ -75,47 +64,45 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.update()
 
         self.timer = pg.QtCore.QTimer()
-        self.timer.timeout.connect(self.update)
-        self.timer.start(int(1e3 * self.interval))  # fires every 1000ms = 1s
+        self.timer.timeout.connect(self.spec_grabber.thread.start)
+        self.timer.start()
 
         self.show()
-    
+
     def reference_file_dialog(self):
         dialog = QFileDialog(self, caption='Reference File')
         dialog.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
         dialog.setFileMode(QtWidgets.QFileDialog.AnyFile)
         # dialog.setOption(QtWidgets.QFileDialog.ShowDirsOnly, True)
         dialog.setLabelText(QtWidgets.QFileDialog.Accept, "Select File")
-        
+
         tree_view = dialog.findChild(QtWidgets.QTreeView)
         tree_view.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
-        
+
         if dialog.exec_():
             files = dialog.selectedFiles()
-        
-            
+
             if self.read_reference(files):
                 self._reference_data_item.setData(self.ref_xdata, self.ref_ydata)
                 self.relative_checkbox.setEnabled(True)
                 self.select_reference_button.setText(f'Averaged from\n{len(files)} files')
                 self.select_reference_button.setFont(QtGui.QFont('Segoe UI', weight=QtGui.QFont.Bold))
-            
+
     def deselect_reference(self):
         self.relative_checkbox.setChecked(False)
         self.relative_checkbox.setEnabled(False)
         self._reference_data_item.clear()
         self._reference_data_item.setVisible(True)
-        
+
         self.select_reference_button.setText(f'Open File(s)')
         self.select_reference_button.setFont(QtGui.QFont('Segoe UI', weight=QtGui.QFont.Normal))
-    
+
     def relative_state_changed(self, state):
         if self.relative_checkbox.isChecked():
             self._reference_data_item.setVisible(False)
-        
+
         else:
             self._reference_data_item.setVisible(True)
-
 
     def save_file_dialog(self):
         dialog = QFileDialog(self, caption='Data Log File Dir')
@@ -133,18 +120,18 @@ class LiveViewUi(QtWidgets.QMainWindow):
     def update_prefix(self, prefix):
         self.prefix = prefix
         self.update_save_folder()
-        
+
     def update_save_folder(self):
         _dis_ls = []
-        
+
         try:
             _dis_ls.append(os.path.basename(self.save_folder))
             self.select_folder_button.setFont(QtGui.QFont('Times', weight=QtGui.QFont.Bold))
             self.select_folder_button.setText(os.path.basename(self.save_folder))
-            
+
         except AttributeError:
             _dis_ls.append('❌')
-            
+
         try:
             if self.prefix != '':
                 _dis_ls.append(self.prefix)
@@ -154,7 +141,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
             _dis_ls.append('❌')
 
         str_display = 'Folder:  {0}\nPrefix:  {1}'.format(*_dis_ls)
-        self.statusbar.showMessage(str_display, msecs= 10000)
+        self.statusbar.showMessage(str_display, msecs=10000)
         self.folder_label.setText(str_display)
 
     def measure(self):
@@ -162,61 +149,53 @@ class LiveViewUi(QtWidgets.QMainWindow):
             if self.prefix != '':
                 _file_directory = os.path.join(self.save_folder, self.prefix)
             else:
-                self.statusbar.showMessage('⛔️Set prefix to none empty value.', msecs= 5000)
+                self.statusbar.showMessage('⛔️Set prefix to none empty value.', msecs=5000)
                 return
-            
+
         except AttributeError:
-            self.statusbar.showMessage('❌ Save directory was not established.', msecs= 5000)
+            self.statusbar.showMessage('❌ Save directory was not established.', msecs=5000)
             return
-        
-        if not os.path.exists(_file_directory):
-            os.makedirs(_file_directory)
-        
-        n_times = int(self.measure_number_spinbox.value())
-        
-        for n in np.arange(n_times):
-            np.savetxt(_file_directory + os.path.sep + f"_{n}.csv", self.spec.spectrum().T, 
-                       fmt = '%-.18E , %-.18E', newline='\n',
-                       header = '# x (wavelengths), y (counts)',
-                       comments=  '\n'.join([f'# Integration time = {self.integration_time_edit.text()} ms',
-                                   f'# Spectrometer: {self.spec.model}',
-                                   '# Time: '+ datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'),
-                                   '\n']))
-        
-        _str_display = f'👌 {n+1}'+ " Files saved under"+ self.save_folder + '/' + self.prefix +'_<......>.csv'
-        
-        self.statusbar.showMessage(_str_display, msecs= 10000)
-        
+
+        if not os.path.exists(self.save_folder):
+            os.makedirs(self.save_folder)
+
+        # n_times = int(self.measure_number_spinbox.value())
+
+        # for n in np.arange(n_times):
+        np.savetxt(_file_directory + f"_.csv", np.array([self.xdata,self.ydata]).T,
+                    fmt='%-.18E , %-.18E', newline='\n',
+                    header='# x (wavelengths), y (counts)',
+                    comments='\n'.join([f'# Integration time = {self.integration_time_edit.text()} ms',
+                                        f'# Spectrometer: {self.spec.model}',
+                                        '# Time: ' + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'),
+                                        '\n']))
+
+        _str_display = f'👌 {n+1}' + " Files saved under" + self.save_folder + '/' + self.prefix + '_<......>.csv'
+
+        self.statusbar.showMessage(_str_display, msecs=10000)
+
     def read_reference(self, paths):
         """
         Select one or more files to get an average reference. 
         Returns true if such reference spectra can be generated successfully."""
         _y_data = []
-        
+
         for f in paths:
-            x, y = np.loadtxt(f, delimiter = ',').T
-        
+            x, y = np.loadtxt(f, delimiter=',').T
+
             try:
                 if np.any(x != self.ref_xdata):
-                    self.statusbar.showMessage('❌ Selected reference data contain different wavelength selections.', msecs= 5000)
+                    self.statusbar.showMessage(
+                        '❌ Selected reference data contain different wavelength selections.', msecs=5000)
                     return False
-                    
+
             except AttributeError:
                 self.ref_xdata = x
-            
+
             _y_data.append(y)
-        
+
         self.ref_ydata = np.mean(_y_data, axis=0)
         return True
-
-    def change_integration_time(self, integration_time=100):  # argument is in ms
-        try:
-            intt = float(integration_time)
-            self.spec.integration_time_micros(1e3 * intt)  # 0.1 seconds
-
-        except ValueError:
-            # no actual number input, just clicked inside and outside of the edit box
-            pass
 
     def readData(self):
         self.xdata = np.array(self.spec.wavelengths())
@@ -227,19 +206,18 @@ class LiveViewUi(QtWidgets.QMainWindow):
             sum(self.ydata * (self.xdata - self.mean) ** 2) / self.length
         )  # note this correction
         return self.xdata, self.ydata
-        
 
-    def update(self):
-        self.readData()
+    def update(self, spec_data):
+        self.xdata, self.ydata = spec_data
         x = self.xdata
         y = self.ydata
-        
+
         self.max_value_label.setText(f'Max: {np.max(y):.0f}/{self.spec.max_intensity:.0f}')
-        
+
         if self.relative_checkbox.isChecked():
             # potential division by zero here
-            with np.errstate(divide='ignore',invalid='ignore'):
+            with np.errstate(divide='ignore', invalid='ignore'):
                 self._measurements_data_item.setData(x=self.xdata, y=self.ydata/self.ref_ydata)
-        
+
         else:
             self._measurements_data_item.setData(x=self.xdata, y=self.ydata)
