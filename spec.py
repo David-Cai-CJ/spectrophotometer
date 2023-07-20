@@ -1,11 +1,8 @@
 
-import logging as log
-import io
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject, QThread
 from PyQt5.QtWidgets import QAction, QMenu
 import numpy as np
 from seabreeze.spectrometers import Spectrometer
-
 
 
 
@@ -14,7 +11,7 @@ class SpectrumGrabber(QObject):
     class capable of setting the collecting images from the detector in a non-blocking fashion
     """
 
-    spec_ready = pyqtSignal(np.ndarray)
+    spec_ready = pyqtSignal(list)
 
     def __init__(self, serial_number=None):
         super().__init__()
@@ -27,20 +24,20 @@ class SpectrumGrabber(QObject):
             self.serial_number = self.spec.serial_number
             
         self.wavelengths = self.spec.wavelengths()
-            
-        self.change_number_of_spectrum(1)
+        self.len = len(self.wavelengths)
 
         self.thread = QThread()
         self.moveToThread(self.thread)
         self.thread.started.connect(self.get_spectrum)
-        
+
         
     def change_integration_time(self, time_ms):
         try:
-            intt = float(time_ms) * 100
+            intt = int(float(time_ms) * 1000)
             
-            lower, upper  = self.spec.integration_time_micros_limits()
-            if intt > upper and intt < lower:
+            lower, upper  = self.spec.integration_time_micros_limits
+
+            if intt < upper and intt > lower:
                 self.spec.integration_time_micros(intt)
                 self.clear_spectrum()
                 return 0 
@@ -55,21 +52,23 @@ class SpectrumGrabber(QObject):
 
     
     def clear_spectrum(self):
-        self.accumulated_spectrum = None
-        self.current_spectrum = None
+        self.accumulated_spectrum = np.zeros(self.len)
+        self.current_spectrum = np.zeros(self.len)
     
     def change_number_of_spectrum(self, num):
+        print(f"Num changed to {num}")
         self.number_spectrum = num
         self.clear_spectrum()
         
     def get_spectrum(self):
-        _spec_read = None
-        
+        _spec_read = np.zeros(self.len)
         for _ in range(self.number_spectrum):
+            if self.thread.isInterruptionRequested():
+                self.thread.quit()
+                return
+            print(_)
             self.current_spectrum = self.spec.intensities()
             _spec_read += self.current_spectrum
 
         self.accumulated_spectrum = _spec_read
-        
-        self.spec_ready.emit(np.ndarray([self.wavelengths, _spec_read]))
-    
+        self.spec_ready.emit([self.wavelengths, _spec_read])

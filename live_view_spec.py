@@ -29,11 +29,13 @@ class LiveViewUi(QtWidgets.QMainWindow):
         )
 
         self.spec_grabber = SpectrumGrabber()
+        self.spec_grabber.spec_ready.connect(self.update)
+        self.max_intensity = self.spec_grabber.spec.max_intensity
 
-        self.integration_time_edit.editingFinished.connect(
-            lambda: self.spec_grabber.change_integration_time(self.integration_time_edit.text()))
+        self.spec_grabber.change_integration_time(self.integration_time_edit.text())
+        
+        self.spec_grabber.change_number_of_spectrum(self.measure_number_spinbox.value())
 
-        self.integration_time_edit.editingFinished.emit()  
 
         self.viewer.getPlotItem().setLabel("left", "Counts [au]")
         self.viewer.getPlotItem().setLabel("bottom", "Wavelength [nm]")
@@ -60,14 +62,32 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.measure_button.clicked.connect(self.measure)
         self.prefix_line_edit.editingFinished.connect(
             lambda: self.update_prefix(self.prefix_line_edit.text()))
+        
 
-        self.update()
+        # Changes which could interrupt spec acquisition thread
+        self.measure_number_spinbox.valueChanged.connect(self.spec_num_change)
+        self.integration_time_edit.editingFinished.connect(
+            lambda: self.int_time_change(self.integration_time_edit.text()))
 
+
+        self.spec_grabber.thread.start()
+        
         self.timer = pg.QtCore.QTimer()
-        self.timer.timeout.connect(self.spec_grabber.thread.start)
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.spec_grabber.get_spectrum)
         self.timer.start()
 
         self.show()
+
+    def spec_num_change(self, num):
+        self.spec_grabber.change_number_of_spectrum(num)
+    
+    
+    def int_time_change(self, time_string_ms):
+        self.spec_grabber.thread.requestInterruption()
+        self.spec_grabber.thread.wait()
+        self.spec_grabber.change_integration_time(time_string_ms)
+        self.spec_grabber.thread.start()
 
     def reference_file_dialog(self):
         dialog = QFileDialog(self, caption='Reference File')
@@ -159,18 +179,16 @@ class LiveViewUi(QtWidgets.QMainWindow):
         if not os.path.exists(self.save_folder):
             os.makedirs(self.save_folder)
 
-        # n_times = int(self.measure_number_spinbox.value())
-
-        # for n in np.arange(n_times):
         np.savetxt(_file_directory + f"_.csv", np.array([self.xdata,self.ydata]).T,
                     fmt='%-.18E , %-.18E', newline='\n',
                     header='# x (wavelengths), y (counts)',
-                    comments='\n'.join([f'# Integration time = {self.integration_time_edit.text()} ms',
-                                        f'# Spectrometer: {self.spec.model}',
+                    comments='\n'.join([f'# Integration time per Spectra = {self.integration_time_edit.text()} ms',
+                                        f'# Number of integrations = {self.measure_number_spinbox.value()}'
+                                        f'# Spectrometer: {self.spec_grabber.spec.model}',
                                         '# Time: ' + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'),
                                         '\n']))
 
-        _str_display = f'👌 {n+1}' + " Files saved under" + self.save_folder + '/' + self.prefix + '_<......>.csv'
+        _str_display = f'👌 ' + " Files saved under" + self.save_folder + '/' + self.prefix + '_<......>.csv'
 
         self.statusbar.showMessage(_str_display, msecs=10000)
 
@@ -212,12 +230,14 @@ class LiveViewUi(QtWidgets.QMainWindow):
         x = self.xdata
         y = self.ydata
 
-        self.max_value_label.setText(f'Max: {np.max(y):.0f}/{self.spec.max_intensity:.0f}')
+        self.max_value_label.setText(f'Max: {np.max(y):.0f}/{self.max_intensity:.0f}')
 
         if self.relative_checkbox.isChecked():
             # potential division by zero here
             with np.errstate(divide='ignore', invalid='ignore'):
-                self._measurements_data_item.setData(x=self.xdata, y=self.ydata/self.ref_ydata)
+                self._measurements_data_item.setData(x=self.xdata, y= 1 -self.ydata/self.ref_ydata)
 
         else:
             self._measurements_data_item.setData(x=self.xdata, y=self.ydata)
+
+        self.timer.start()
