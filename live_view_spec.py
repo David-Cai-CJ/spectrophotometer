@@ -3,13 +3,9 @@ import numpy as np
 from PyQt5 import QtWidgets, QtCore, QtGui, uic
 from PyQt5.QtWidgets import QFileDialog
 import pyqtgraph as pg
-from seabreeze.spectrometers import Spectrometer
 from contextlib import contextmanager
 # from qdarkstyle import load_stylesheet_pyqt5
-import sys
 import os
-from scipy.optimize import curve_fit, OptimizeWarning
-from scipy.signal import find_peaks
 import datetime
 from spec import SpectrumGrabber
 
@@ -27,6 +23,9 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.settings = QtCore.QSettings(
             "Siwick Research Group", "Spectrometer Liveview", parent=self
         )
+        
+        self._ref_selected = False
+        self._dark_selected = False
 
         self.spec_grabber = SpectrumGrabber()
         self.spec_grabber.spec_ready.connect(self.update)
@@ -56,8 +55,10 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
         self.select_folder_button.clicked.connect(self.save_file_dialog)
         self.select_reference_button.clicked.connect(self.reference_file_dialog)
+        self.select_dark_button.clicked.connect(self.dark_file_dialog)
         self.save_folder_signal.connect(lambda x: print(os.path.basename(x)))
         self.deselect_reference_button.clicked.connect(self.deselect_reference)
+        self.deselect_dark_button.clicked.connect(self.deselect_dark)
         self.relative_checkbox.stateChanged.connect(self.relative_state_changed)
         self.measure_button.clicked.connect(self.measure)
         self.prefix_line_edit.editingFinished.connect(
@@ -103,20 +104,18 @@ class LiveViewUi(QtWidgets.QMainWindow):
         if dialog.exec_():
             files = dialog.selectedFiles()
 
-            if self.read_dark(files):
-                self._dark_data_item.setData(self.ref_xdata, self.ref_ydata)
-                self.relative_checkbox.setEnabled(True)
-                self.select_reference_button.setText(f'Averaged from\n{len(files)} files')
-                self.select_reference_button.setFont(QtGui.QFont('Segoe UI', weight=QtGui.QFont.Bold))
+            self.dark_xdata, self.dark_ydata = self.read_files(files)
+            self.subtract_dark_checkbox.setEnabled(True)
+            self.select_dark_button.setText(f'Averaged from\n{len(files)} files')
+            self.select_dark_button.setFont(QtGui.QFont('Segoe UI', weight=QtGui.QFont.Bold))
+            self._dark_selected = True
 
-    def deselect_reference(self):
-        self.relative_checkbox.setChecked(False)
-        self.relative_checkbox.setEnabled(False)
-        self._reference_data_item.clear()
-        self._reference_data_item.setVisible(True)
-
-        self.select_reference_button.setText(f'Open File(s)')
-        self.select_reference_button.setFont(QtGui.QFont('Segoe UI', weight=QtGui.QFont.Normal))
+    def deselect_dark(self):
+        self.subtract_dark_checkbox.setChecked(False)
+        self.subtract_dark_checkbox.setEnabled(False)
+        self.select_dark_button.setText(f'Open File(s)')
+        self.select_dark_button.setFont(QtGui.QFont('Segoe UI', weight=QtGui.QFont.Normal))
+        self._dark_selected = False
 
 
     def reference_file_dialog(self):
@@ -132,11 +131,12 @@ class LiveViewUi(QtWidgets.QMainWindow):
         if dialog.exec_():
             files = dialog.selectedFiles()
 
-            if self.read_reference(files):
-                self._reference_data_item.setData(self.ref_xdata, self.ref_ydata)
-                self.relative_checkbox.setEnabled(True)
-                self.select_reference_button.setText(f'Averaged from\n{len(files)} files')
-                self.select_reference_button.setFont(QtGui.QFont('Segoe UI', weight=QtGui.QFont.Bold))
+            self.ref_xdata, self.ref_ydata = self.read_files(files)
+            self._reference_data_item.setData(self.ref_xdata, self.ref_ydata)
+            self.relative_checkbox.setEnabled(True)
+            self.select_reference_button.setText(f'Averaged from\n{len(files)} files')
+            self.select_reference_button.setFont(QtGui.QFont('Segoe UI', weight=QtGui.QFont.Bold))
+            self._ref_selected= True
 
     def deselect_reference(self):
         self.relative_checkbox.setChecked(False)
@@ -146,6 +146,7 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
         self.select_reference_button.setText(f'Open File(s)')
         self.select_reference_button.setFont(QtGui.QFont('Segoe UI', weight=QtGui.QFont.Normal))
+        self._ref_selected= False
 
     def relative_state_changed(self, state):
         if self.relative_checkbox.isChecked():
@@ -214,25 +215,25 @@ class LiveViewUi(QtWidgets.QMainWindow):
         
         try:
             latest_idx = int(sorted([os.path.basename(f).split("_")[-1].split(".csv")[0] for f in data_files])[-1])
-            fname = self.prefix + f"_{latest_idx + 1:02d}.csv"
+            fname = self.prefix + f"_{latest_idx + 1:04d}.csv"
         
         except IndexError:
-            fname =  self.prefix + f"_{0:02d}.csv"
+            fname =  self.prefix + f"_{0:04d}.csv"
             
         np.savetxt(os.path.join(self.save_folder, fname), np.array([self.xdata,self.ydata]).T,
                     fmt='%-.18E , %-.18E', newline='\n',
                     header='# x (wavelengths), y (counts)',
                     comments='\n'.join([f'# Integration time per Spectra = {self.integration_time_edit.text()} ms',
-                                        f'# Number of integrations = {self.measure_number_spinbox.value()}'
+                                        f'# Number of integrations = {self.measure_number_spinbox.value()}',
                                         f'# Spectrometer: {self.spec_grabber.spec.model}',
                                         '# Time: ' + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'),
                                         '\n']))
 
-        _str_display = f'👌 ' + " Files saved under" + self.save_folder + '/' + self.prefix + '_<......>.csv'
+        _str_display = f'👌 ' + " Files saved under" + self.save_folder + '/' + self.prefix + fname
 
         self.statusbar.showMessage(_str_display, msecs=10000)
 
-    def read_reference(self, paths):
+    def read_files(self, paths):
         """
         Select one or more files to get an average reference. 
         Returns true if such reference spectra can be generated successfully."""
@@ -242,18 +243,18 @@ class LiveViewUi(QtWidgets.QMainWindow):
             x, y = np.loadtxt(f, delimiter=',').T
 
             try:
-                if np.any(x != self.ref_xdata):
+                if np.any(x != _x_data):
                     self.statusbar.showMessage(
-                        '❌ Selected reference data contain different wavelength selections.', msecs=5000)
+                        '❌ Selected data files contain different wavelength selections.', msecs=5000)
                     return False
 
-            except AttributeError:
-                self.ref_xdata = x
+            except UnboundLocalError:
+                _x_data = x
 
             _y_data.append(y)
 
-        self.ref_ydata = np.mean(_y_data, axis=0)
-        return True
+        _y_data = np.mean(_y_data, axis=0)
+        return _x_data, _y_data
 
     def readData(self):
         self.xdata = np.array(self.spec.wavelengths())
@@ -267,17 +268,30 @@ class LiveViewUi(QtWidgets.QMainWindow):
 
     def update(self, spec_data):
         self.xdata, self.ydata = spec_data
-        x = self.xdata
-        y = self.ydata
-
+        x = self.xdata[:]
+        y = self.ydata[:]
+        
+        if self._dark_selected:
+            darky = self.dark_ydata
+        
+        if self._ref_selected:
+            refy = self.ref_ydata 
+        
         self.max_value_label.setText(f'Max: {np.max(y):.0f}/{self.max_intensity:.0f}')
-
+        
+        if self.subtract_dark_checkbox.isChecked():
+            y = y - darky
+            if self._ref_selected:
+                refy = refy - darky
+            
         if self.relative_checkbox.isChecked():
             # potential division by zero here
             with np.errstate(divide='ignore', invalid='ignore'):
-                self._measurements_data_item.setData(x=self.xdata, y= 1 -self.ydata/self.ref_ydata)
+                self._measurements_data_item.setData(x=x, y= 1 - y/refy)
 
         else:
-            self._measurements_data_item.setData(x=self.xdata, y=self.ydata)
+            self._measurements_data_item.setData(x=x, y=y)
+            if self._ref_selected:
+                self._reference_data_item.setData(x, refy)
 
         self.timer.start()

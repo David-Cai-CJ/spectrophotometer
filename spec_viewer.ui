@@ -34,7 +34,7 @@
          </property>
          <layout class="QHBoxLayout" name="horizontalLayout_12">
           <item>
-           <widget class="QCheckBox" name="checkBox">
+           <widget class="QCheckBox" name="subtract_dark_checkbox">
             <property name="enabled">
              <bool>false</bool>
             </property>
@@ -470,7 +470,7 @@
           <item>
            <widget class="QPushButton" name="select_dark_button">
             <property name="text">
-             <string>Open File</string>
+             <string>Open File(s)</string>
             </property>
            </widget>
           </item>
