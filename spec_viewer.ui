@@ -34,6 +34,16 @@
          </property>
          <layout class="QHBoxLayout" name="horizontalLayout_12">
           <item>
+           <widget class="QCheckBox" name="checkBox">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="text">
+             <string>Subtract Dark</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QCheckBox" name="relative_checkbox">
             <property name="enabled">
              <bool>false</bool>
@@ -243,6 +253,12 @@
          </property>
          <item>
           <widget class="QWidget" name="widget_3" native="true">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
            <layout class="QVBoxLayout" name="verticalLayout_7">
             <item>
              <widget class="QLabel" name="label_9">
@@ -356,7 +372,7 @@
               <property name="minimumSize">
                <size>
                 <width>0</width>
-                <height>55</height>
+                <height>0</height>
                </size>
               </property>
               <property name="text">
@@ -413,7 +429,7 @@
          <property name="minimumSize">
           <size>
            <width>0</width>
-           <height>80</height>
+           <height>40</height>
           </size>
          </property>
          <property name="font">
@@ -431,6 +447,41 @@
          <property name="text">
           <string>Measure (Abs.)</string>
          </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QWidget" name="widget_8" native="true">
+         <layout class="QVBoxLayout" name="verticalLayout_8">
+          <item alignment="Qt::AlignHCenter|Qt::AlignVCenter">
+           <widget class="QLabel" name="label">
+            <property name="font">
+             <font>
+              <family>Segoe UI</family>
+              <pointsize>10</pointsize>
+              <weight>75</weight>
+              <bold>true</bold>
+             </font>
+            </property>
+            <property name="text">
+             <string>Dark Spectra</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="select_dark_button">
+            <property name="text">
+             <string>Open File</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="deselect_dark_button">
+            <property name="text">
+             <string>Deselect</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </widget>
        </item>
       </layout>

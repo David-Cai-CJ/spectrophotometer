@@ -88,6 +88,36 @@ class LiveViewUi(QtWidgets.QMainWindow):
         self.spec_grabber.thread.wait()
         self.spec_grabber.change_integration_time(time_string_ms)
         self.spec_grabber.thread.start()
+        
+        
+    def dark_file_dialog(self):
+        dialog = QFileDialog(self, caption='Dark Spectra File')
+        dialog.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
+        dialog.setFileMode(QtWidgets.QFileDialog.AnyFile)
+        # dialog.setOption(QtWidgets.QFileDialog.ShowDirsOnly, True)
+        dialog.setLabelText(QtWidgets.QFileDialog.Accept, "Select File")
+
+        tree_view = dialog.findChild(QtWidgets.QTreeView)
+        tree_view.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
+
+        if dialog.exec_():
+            files = dialog.selectedFiles()
+
+            if self.read_dark(files):
+                self._dark_data_item.setData(self.ref_xdata, self.ref_ydata)
+                self.relative_checkbox.setEnabled(True)
+                self.select_reference_button.setText(f'Averaged from\n{len(files)} files')
+                self.select_reference_button.setFont(QtGui.QFont('Segoe UI', weight=QtGui.QFont.Bold))
+
+    def deselect_reference(self):
+        self.relative_checkbox.setChecked(False)
+        self.relative_checkbox.setEnabled(False)
+        self._reference_data_item.clear()
+        self._reference_data_item.setVisible(True)
+
+        self.select_reference_button.setText(f'Open File(s)')
+        self.select_reference_button.setFont(QtGui.QFont('Segoe UI', weight=QtGui.QFont.Normal))
+
 
     def reference_file_dialog(self):
         dialog = QFileDialog(self, caption='Reference File')
@@ -179,7 +209,17 @@ class LiveViewUi(QtWidgets.QMainWindow):
         if not os.path.exists(self.save_folder):
             os.makedirs(self.save_folder)
 
-        np.savetxt(_file_directory + f"_.csv", np.array([self.xdata,self.ydata]).T,
+        import glob
+        data_files = glob.glob(self.save_folder + os.path.sep + self.prefix +"_*.csv")
+        
+        try:
+            latest_idx = int(sorted([os.path.basename(f).split("_")[-1].split(".csv")[0] for f in data_files])[-1])
+            fname = self.prefix + f"_{latest_idx + 1:02d}.csv"
+        
+        except IndexError:
+            fname =  self.prefix + f"_{0:02d}.csv"
+            
+        np.savetxt(os.path.join(self.save_folder, fname), np.array([self.xdata,self.ydata]).T,
                     fmt='%-.18E , %-.18E', newline='\n',
                     header='# x (wavelengths), y (counts)',
                     comments='\n'.join([f'# Integration time per Spectra = {self.integration_time_edit.text()} ms',

@@ -56,7 +56,6 @@ class SpectrumGrabber(QObject):
         self.current_spectrum = np.zeros(self.len)
     
     def change_number_of_spectrum(self, num):
-        print(f"Num changed to {num}")
         self.number_spectrum = num
         self.clear_spectrum()
         
@@ -66,7 +65,6 @@ class SpectrumGrabber(QObject):
             if self.thread.isInterruptionRequested():
                 self.thread.quit()
                 return
-            print(_)
             self.current_spectrum = self.spec.intensities()
             _spec_read += self.current_spectrum
 
